@@ -1,0 +1,121 @@
+import os
+import requests
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+
+# Initialize Flask application
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+
+# OpenWeatherMap API Configuration
+API_KEY = "your_openweathermap_api_key"  # Replace with your actual API key
+BASE_URL = "http://api.openweathermap.org/data/2.5/weather?"
+
+# Routes
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/weather', methods=['POST'])
+def weather():
+    city = request.form['city']
+    if not city:
+        flash('City name is required!', 'error')
+        return redirect(url_for('home'))
+    
+    # Fetch weather data from the API
+    try:
+        response = requests.get(f"{BASE_URL}q={city}&appid={API_KEY}&units=metric")
+        data = response.json()
+        
+        if data['cod'] != 200:
+            flash(f"City {city} not found!", 'error')
+            return redirect(url_for('home'))
+        
+        weather_data = {
+            "city": city,
+            "temperature": data['main']['temp'],
+            "description": data['weather'][0]['description'],
+            "humidity": data['main']['humidity'],
+            "pressure": data['main']['pressure'],
+            "icon": data['weather'][0]['icon'],
+            "wind_speed": data['wind']['speed'],
+            "country": data['sys']['country'],
+            "timezone": data['timezone']
+        }
+        return render_template('weather.html', weather_data=weather_data)
+    
+    except Exception as e:
+        flash(f"An error occurred: {str(e)}", 'error')
+        return redirect(url_for('home'))
+
+@app.route('/forecast', methods=['POST'])
+def forecast():
+    city = request.form['city']
+    if not city:
+        flash('City name is required!', 'error')
+        return redirect(url_for('home'))
+    
+    try:
+        response = requests.get(f"{BASE_URL}q={city}&appid={API_KEY}&units=metric")
+        data = response.json()
+        
+        if data['cod'] != 200:
+            flash(f"City {city} not found!", 'error')
+            return redirect(url_for('home'))
+        
+        forecast_data = {
+            "city": city,
+            "temperature": data['main']['temp'],
+            "description": data['weather'][0]['description'],
+            "humidity": data['main']['humidity'],
+            "pressure": data['main']['pressure'],
+            "icon": data['weather'][0]['icon'],
+            "wind_speed": data['wind']['speed'],
+            "country": data['sys']['country']
+        }
+        return render_template('forecast.html', forecast_data=forecast_data)
+    
+    except Exception as e:
+        flash(f"An error occurred: {str(e)}", 'error')
+        return redirect(url_for('home'))
+
+@app.route('/api/weather', methods=['GET'])
+def api_weather():
+    city = request.args.get('city')
+    if not city:
+        return jsonify({"error": "City is required"}), 400
+    
+    try:
+        response = requests.get(f"{BASE_URL}q={city}&appid={API_KEY}&units=metric")
+        data = response.json()
+        
+        if data['cod'] != 200:
+            return jsonify({"error": f"City {city} not found"}), 404
+        
+        weather_data = {
+            "city": city,
+            "temperature": data['main']['temp'],
+            "description": data['weather'][0]['description'],
+            "humidity": data['main']['humidity'],
+            "pressure": data['main']['pressure'],
+            "icon": data['weather'][0]['icon'],
+            "wind_speed": data['wind']['speed'],
+            "country": data['sys']['country']
+        }
+        return jsonify(weather_data)
+    
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+# Error handling
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500
+
+# Main entry point
+if __name__ == '__main__':
+    app.run(debug=True)
