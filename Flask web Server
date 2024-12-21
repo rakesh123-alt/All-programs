@@ -1,0 +1,145 @@
+import os
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# Initialize Flask app
+app = Flask(__name__)
+app.secret_key = os.urandom(24)  # Secret key for session handling
+app.config['SESSION_TYPE'] = 'filesystem'
+
+# Mock database (for the sake of this example)
+users_db = {
+    "user1": {
+        "password": generate_password_hash("password123"),  # Password hashed
+        "email": "user1@example.com",
+    }
+}
+
+posts_db = [
+    {"id": 1, "title": "First Post", "content": "This is the first post.", "author": "user1"},
+    {"id": 2, "title": "Second Post", "content": "This is the second post.", "author": "user1"}
+]
+
+# Routes
+@app.route('/')
+def home():
+    return render_template('index.html', posts=posts_db)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        # Validate user credentials
+        if username in users_db and check_password_hash(users_db[username]['password'], password):
+            session['username'] = username
+            flash("Logged in successfully", "success")
+            return redirect(url_for('home'))
+        else:
+            flash("Invalid credentials. Try again.", "error")
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)  # Remove user session
+    flash("You have logged out.", "success")
+    return redirect(url_for('home'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        email = request.form['email']
+        
+        # Check if username exists in the "database"
+        if username in users_db:
+            flash("Username already exists.", "error")
+        else:
+            users_db[username] = {
+                "password": generate_password_hash(password),
+                "email": email,
+            }
+            flash("Registration successful! Please log in.", "success")
+            return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+@app.route('/post/<int:post_id>')
+def post(post_id):
+    post = next((p for p in posts_db if p['id'] == post_id), None)
+    if post:
+        return render_template('post.html', post=post)
+    else:
+        flash("Post not found.", "error")
+        return redirect(url_for('home'))
+
+@app.route('/create_post', methods=['GET', 'POST'])
+def create_post():
+    if 'username' not in session:
+        flash("You must be logged in to create a post.", "error")
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+        post_id = len(posts_db) + 1
+        new_post = {"id": post_id, "title": title, "content": content, "author": session['username']}
+        posts_db.append(new_post)
+        flash("Post created successfully!", "success")
+        return redirect(url_for('home'))
+    
+    return render_template('create_post.html')
+
+@app.route('/edit_post/<int:post_id>', methods=['GET', 'POST'])
+def edit_post(post_id):
+    post = next((p for p in posts_db if p['id'] == post_id), None)
+    if not post:
+        flash("Post not found.", "error")
+        return redirect(url_for('home'))
+    
+    if 'username' not in session or post['author'] != session['username']:
+        flash("You are not authorized to edit this post.", "error")
+        return redirect(url_for('home'))
+
+    if request.method == 'POST':
+        post['title'] = request.form['title']
+        post['content'] = request.form['content']
+        flash("Post updated successfully.", "success")
+        return redirect(url_for('post', post_id=post_id))
+
+    return render_template('edit_post.html', post=post)
+
+@app.route('/delete_post/<int:post_id>', methods=['POST'])
+def delete_post(post_id):
+    post = next((p for p in posts_db if p['id'] == post_id), None)
+    if not post:
+        flash("Post not found.", "error")
+        return redirect(url_for('home'))
+    
+    if 'username' not in session or post['author'] != session['username']:
+        flash("You are not authorized to delete this post.", "error")
+        return redirect(url_for('home'))
+
+    posts_db.remove(post)
+    flash("Post deleted successfully.", "success")
+    return redirect(url_for('home'))
+
+@app.route('/api/posts', methods=['GET'])
+def api_posts():
+    return jsonify(posts_db)
+
+# Error handling routes
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(e):
+    return render_template('500.html'), 500
+
+# Main entry point
+if __name__ == '__main__':
+    app.run(debug=True)
