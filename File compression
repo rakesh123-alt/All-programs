@@ -1,0 +1,78 @@
+import zipfile
+import os
+import sys
+
+# Compress files into a zip archive
+def compress_files(file_paths, output_zip):
+    try:
+        with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file in file_paths:
+                if os.path.exists(file):
+                    zipf.write(file, os.path.basename(file))
+                    print(f"Added {file} to {output_zip}")
+                else:
+                    print(f"File {file} not found, skipping.")
+        print(f"Compression successful: {output_zip}")
+    except Exception as e:
+        print(f"An error occurred while compressing: {e}")
+
+# Decompress a zip archive into a specified directory
+def decompress_file(zip_file, output_dir):
+    try:
+        with zipfile.ZipFile(zip_file, 'r') as zipf:
+            zipf.extractall(output_dir)
+            print(f"Decompressed {zip_file} into {output_dir}")
+    except zipfile.BadZipFile:
+        print("Error: Not a valid zip file.")
+    except Exception as e:
+        print(f"An error occurred while decompressing: {e}")
+
+# List contents of a zip file
+def list_zip_contents(zip_file):
+    try:
+        with zipfile.ZipFile(zip_file, 'r') as zipf:
+            print(f"Contents of {zip_file}:")
+            zipf.printdir()
+    except zipfile.BadZipFile:
+        print("Error: Not a valid zip file.")
+    except Exception as e:
+        print(f"An error occurred while listing contents: {e}")
+
+# Main function for CLI interaction
+def main():
+    print("Welcome to the File Compression/Decompression Utility!")
+    while True:
+        print("\nPlease select an option:")
+        print("1. Compress Files")
+        print("2. Decompress a Zip File")
+        print("3. List contents of a Zip File")
+        print("4. Exit")
+
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            files = input("Enter the paths of the files to compress (comma-separated): ").split(',')
+            files = [file.strip() for file in files]
+            output_zip = input("Enter the name of the output zip file (e.g., archive.zip): ")
+            compress_files(files, output_zip)
+
+        elif choice == '2':
+            zip_file = input("Enter the path of the zip file to decompress: ")
+            output_dir = input("Enter the directory to extract files to: ")
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            decompress_file(zip_file, output_dir)
+
+        elif choice == '3':
+            zip_file = input("Enter the path of the zip file to list contents: ")
+            list_zip_contents(zip_file)
+
+        elif choice == '4':
+            print("Exiting the utility. Goodbye!")
+            sys.exit(0)
+
+        else:
+            print("Invalid choice, please try again.")
+
+if __name__ == "__main__":
+    main()
